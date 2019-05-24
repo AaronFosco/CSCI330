@@ -1,0 +1,261 @@
+#!/bin/bash
+#  _______________________________________________________________
+# /                                                               \
+#||  Course: CSCI-330      Assignment #: 5    Semester: Fall2017  ||
+#||                                                               ||
+#||  NAME:  Aaron Fosco    Z-ID: z1835687     Section: 3          ||
+#||                                                               ||
+#||  TA's Name: May Myo Khine                                     ||
+#||                                                               ||
+#||  Due: Friday 11/17/2017 by 11:59PM                            ||
+#||                                                               ||
+#||  Description:                                                 ||
+#||    This script will allow manipulations of a database such as ||
+#||    creating a database, adding new entries to a database,     ||
+#||    showing the contents of the database, and deleting         ||
+#||    some or all the contents of a database.                    ||
+#||                                                               ||
+# \_______________________________________________________________/
+
+
+#function to display help text for information about commands
+help () {
+   echo This is the help text provided for this script
+   echo The name of the script will come first folowed by \
+   the name of a database file and a command
+   echo syntax: "$0" database command [parameter]
+   echo here are a list of commands:
+   echo \ new [param1]
+   echo \ \ \ Usage: Creates a new database with 'database' name \
+   and will param1 as the first line in the database. if no \
+   parameter is given, the default is "Automobile Database"
+   echo \ add param1 param2 param3 param4
+   echo \ \ \ useage: adds a record to the database. The four \
+   parameters are needed and must be supplied in this order: \
+   make model year color. The 'year' parameter \(param3\) must \
+   be between 1870 and 2020
+   echo \ show all
+   echo \ \ \ shows all records
+   echo \ show single [param1]
+   echo \ \ \ shows a record at param1
+   echo \ show range [param1] [param2]
+   echo \ \ \ shows a range of records starting from param1 and \
+   ending at param2. param1 must be smaller than param2
+   echo \ delete all
+   echo \ \ \ deletes all recods
+   echo \ delete single [param1]
+   echo \ \ \ deletes a record at param1
+   echo \ delete range [param1] [param2]
+   echo \ \ \ deletes a range of records starting from param1 and \
+   ending at param2. param1 must be smaller than param2
+   exit 1
+}
+
+#function to exit if the number of parameters are incorrect
+invpara () {
+   echo Incorrect Number of parameters!
+   echo For more information, type \'"$0" help\'
+   echo Exiting...
+   exit 1
+}
+
+#function to exit if the range format is incorrect
+invrange () {
+   echo Incorrect Range!
+   echo Please ensure that the starting range is larger \
+   than the ending range
+   exit 1
+}
+
+#function to exit if the command was not found
+invcomm () {
+   echo Invalid Command
+   echo For more information, type \'"$0" help\'
+   echo Exiting...
+   exit 1
+}
+
+#function to figure out if the last line is the same as the first
+#line, ie the database is empty
+testdb () {
+   if [ "$(sed -n -e '1 p' $1)" = "$(sed -n -e '$ p' $1)" ]
+   then
+      echo Database is empty...
+      exit 1
+   fi
+}
+
+#function to see if the file exsists by piping ls into grep and 
+#looking for the supplied database name
+dbexsist () {
+   ls | grep "$1" -q
+   if [ ! $? = 0 ]
+   then
+      echo "$1" doesn\' exsist!
+      exit 1
+   fi
+}
+
+#start to see if the help command was used
+if [ "$1" = help ]
+then
+   help
+fi
+
+#help command was not used, so we start the case 
+case "$2" in
+
+   new)
+   
+   #making sure we have a default
+   if [ $# -gt 2 ]
+   then
+      dbhead="$3"
+   else
+      dbhead="Automobile Database"
+   fi
+   
+   #figuing out if the file exsists already
+   ls | grep "$1" -q
+   if [ ! $? = 0 ]
+   then
+      echo $dbhead >> "$1"
+      echo New database created
+   else
+      echo "$1" Already Exsists, Exiting...
+   fi
+   
+   ;;
+   
+   add)
+   dbexsist "$1"
+   
+   if [ $# != 6 ]
+   then
+      invpara
+   else
+   
+      #if the year is not between 1870 and 2020, exit
+      if [ $5 -gt 1870 -a $5 -lt 2020 ]
+      then
+         linein="$3, $4, $5, $6"
+         echo $linein >> $1
+	 echo Successfully added a record to the database
+      else
+         echo Incorrect Year!
+         echo For more information, type \'"$0" help\'
+         echo Exiting...
+         exit 1 
+      fi
+   fi
+   
+   ;;
+   
+   show)
+   dbexsist "$1"
+   
+   case "$3" in
+   
+      all)
+      testdb $1
+      
+      sed -n -e '1,$ p' "$1"
+      
+      ;;
+      
+      single)      
+      if [ $# != 4 ]
+      then 
+         invpara
+      fi
+      
+      testdb $1
+      
+      sed -e '1 p' -n -e "$(($4 + 1)) p" "$1"
+      
+      ;;
+      
+      range)
+      if [ $# != 5 ]
+      then
+         invpara
+      fi
+      
+      if [ $4 -ge $5 ]
+      then
+         invrange
+      fi
+      
+      testdb $1
+      
+      sed -e '1 p' -n -e "$(($4 + 1)),$(($5 + 1)) p" "$1"
+      
+      ;;
+      
+   esac
+   
+   ;;
+   
+   delete)
+   dbexsist "$1"
+   
+   case $3 in
+      all)
+      testdb $1
+      
+      nodelete="$(sed -n -e '2,$ p' $1 | wc -l)"
+      
+      sed -i -e '2,$ d' $1
+      
+      echo "$nodelete" record\(s\) deleted
+      
+      ;;
+      
+      single)
+      if [ $# != 4 ]
+      then 
+         invpara
+      fi
+      
+      testdb $1
+      
+      nodelete="$(sed -n -e "$(($4 + 1)) p" $1 | wc -l)"
+      
+      sed -i -e "$(($4 + 1)) d" $1
+      
+      echo "$nodelete" record\(s\) deleted
+      
+      ;;
+      
+      range)
+      if [ $# != 5 ]
+      then
+         invpara
+      fi
+      
+      if [ $4 -ge $5 ]
+      then
+         invrange
+      fi
+      
+      testdb $1
+      
+      nodelete="$(sed -n -e "$(($4 + 1)),$(($5 + 1)) p" $1 | wc -l)"
+      
+      sed -i -e "$(($4 + 1)),$(($5 + 1)) d" $1
+      
+      echo "$nodelete" record\(s\) deleted 
+      
+      ;;
+      
+   esac
+   
+   ;;
+   
+   *) 
+   invcomm
+   
+   ;;
+    
+esac
+
